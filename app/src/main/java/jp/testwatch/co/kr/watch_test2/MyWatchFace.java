@@ -31,7 +31,7 @@ import java.util.concurrent.TimeUnit;
  * Analog watch face with a ticking second hand. In ambient mode, the second hand isn't
  * shown. On devices with low-bit ambient mode, the hands are drawn without anti-aliasing in ambient
  * mode. The watch face is drawn with less contrast in mute mode.
- *
+ * <p>
  * Important Note: Because watch face apps do not have a default Activity in
  * their project, you will need to set your Configurations to
  * "Do not launch Activity" for both the Wear and/or Application modules. If you
@@ -57,6 +57,26 @@ public class MyWatchFace extends CanvasWatchFaceService {
         return new Engine();
     }
 
+    private static class EngineHandler extends Handler {
+        private final WeakReference<MyWatchFace.Engine> mWeakReference;
+
+        public EngineHandler(MyWatchFace.Engine reference) {
+            mWeakReference = new WeakReference<>(reference);
+        }
+
+        @Override
+        public void handleMessage(Message msg) {
+            MyWatchFace.Engine engine = mWeakReference.get();
+            if (engine != null) {
+                switch (msg.what) {
+                    case MSG_UPDATE_TIME:
+                        engine.handleUpdateTimeMessage();
+                        break;
+                }
+            }
+        }
+    }
+
     private class Engine extends CanvasWatchFaceService.Engine {
         private static final float HOUR_STROKE_WIDTH = 5f;
         private static final float MINUTE_STROKE_WIDTH = 3f;
@@ -65,36 +85,9 @@ public class MyWatchFace extends CanvasWatchFaceService {
         private static final float CENTER_GAP_AND_CIRCLE_RADIUS = 4f;
 
         private static final int SHADOW_RADIUS = 6;
-
+        /* Handler to update the time once a second in interactive mode. */
+        private final Handler mUpdateTimeHandler = new EngineHandler(this);
         private Calendar mCalendar;
-        private boolean mRegisteredTimeZoneReceiver = false;
-        private boolean mMuteMode;
-
-        private float mCenterX;
-        private float mCenterY;
-
-        private float mSecondHandLength;
-        private float sMinuteHandLength;
-        private float sHourHandLength;
-
-        /* Colors for all hands (hour, minute, seconds, ticks) based on photo loaded. */
-        private int mWatchHandColor;
-        private int mWatchHandHighlightColor;
-        private int mWatchHandShadowColor;
-
-        private Paint mHourPaint;
-        private Paint mMinutePaint;
-        private Paint mSecondPaint;
-        private Paint mTickAndCirclePaint;
-
-        private Paint mBackgroundPaint;
-        private Bitmap mBackgroundBitmap;
-        private Bitmap mGrayBackgroundBitmap;
-
-        private boolean mAmbient;
-        private boolean mLowBitAmbient;
-        private boolean mBurnInProtection;
-
         private final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
@@ -102,9 +95,27 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 invalidate();
             }
         };
-
-        /* Handler to update the time once a second in interactive mode. */
-        private final Handler mUpdateTimeHandler = new EngineHandler(this);
+        private boolean mRegisteredTimeZoneReceiver = false;
+        private boolean mMuteMode;
+        private float mCenterX;
+        private float mCenterY;
+        private float mSecondHandLength;
+        private float sMinuteHandLength;
+        private float sHourHandLength;
+        /* Colors for all hands (hour, minute, seconds, ticks) based on photo loaded. */
+        private int mWatchHandColor;
+        private int mWatchHandHighlightColor;
+        private int mWatchHandShadowColor;
+        private Paint mHourPaint;
+        private Paint mMinutePaint;
+        private Paint mSecondPaint;
+        private Paint mTickAndCirclePaint;
+        private Paint mBackgroundPaint;
+        private Bitmap mBackgroundBitmap;
+        private Bitmap mGrayBackgroundBitmap;
+        private boolean mAmbient;
+        private boolean mLowBitAmbient;
+        private boolean mBurnInProtection;
 
         @Override
         public void onCreate(SurfaceHolder holder) {
@@ -204,8 +215,8 @@ public class MyWatchFace extends CanvasWatchFaceService {
             updateTimer();
         }
 
-        private void updateWatchHandStyle(){
-            if (mAmbient){
+        private void updateWatchHandStyle() {
+            if (mAmbient) {
                 mHourPaint.setColor(Color.WHITE);
                 mMinutePaint.setColor(Color.WHITE);
                 mSecondPaint.setColor(Color.WHITE);
@@ -309,6 +320,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
             grayPaint.setColorFilter(filter);
             canvas.drawBitmap(mBackgroundBitmap, 0, 0, grayPaint);
         }
+
         /**
          * Captures tap event (and tap type). The {@link WatchFaceService#TAP_TYPE_TAP} case can be
          * used for implementing specific logic to handle the gesture.
@@ -331,6 +343,7 @@ public class MyWatchFace extends CanvasWatchFaceService {
             }
             invalidate();
         }
+
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
             long now = System.currentTimeMillis();
@@ -490,26 +503,6 @@ public class MyWatchFace extends CanvasWatchFaceService {
                 long delayMs = INTERACTIVE_UPDATE_RATE_MS
                         - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
-            }
-        }
-    }
-
-    private static class EngineHandler extends Handler {
-        private final WeakReference<MyWatchFace.Engine> mWeakReference;
-
-        public EngineHandler(MyWatchFace.Engine reference) {
-            mWeakReference = new WeakReference<>(reference);
-        }
-
-        @Override
-        public void handleMessage(Message msg) {
-            MyWatchFace.Engine engine = mWeakReference.get();
-            if (engine != null) {
-                switch (msg.what) {
-                    case MSG_UPDATE_TIME:
-                        engine.handleUpdateTimeMessage();
-                        break;
-                }
             }
         }
     }
